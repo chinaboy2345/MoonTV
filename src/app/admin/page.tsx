@@ -22,6 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+  Bell,
   Check,
   ChevronDown,
   ChevronUp,
@@ -65,6 +66,8 @@ interface SiteConfig {
   DoubanImageProxyType: string;
   DoubanImageProxy: string;
   DisableYellowFilter: boolean;
+  TVBoxEnabled?: boolean;
+  TVBoxPassword?: string;
 }
 
 // 视频源数据类型
@@ -1168,15 +1171,15 @@ const CategoryConfig = ({
             </span>
           )}
         </h4>
-        <button
-          disabled
-          className='px-3 py-1 text-sm rounded-lg transition-colors bg-gray-400 cursor-not-allowed text-white'
-        >
-          {showAddForm ? '取消' : '添加分类'}
-        </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className='px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors'
+            >
+              {showAddForm ? '取消' : '添加分类'}
+            </button>
       </div>
 
-      {false && showAddForm && (
+          {showAddForm && (
         <div className='p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4'>
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <input
@@ -1383,9 +1386,19 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
     DoubanImageProxyType: 'direct',
     DoubanImageProxy: '',
     DisableYellowFilter: false,
+    TVBoxEnabled: false,
+    TVBoxPassword: '',
   });
   // 保存状态
   const [saving, setSaving] = useState(false);
+  
+  // TVBox 密码生成
+  const generateRandomPassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    return Array.from({ length: 16 })
+      .map(() => alphabet[Math.floor(Math.random() * alphabet.length)])
+      .join('');
+  };
 
   // 豆瓣数据源相关状态
   const [isDoubanDropdownOpen, setIsDoubanDropdownOpen] = useState(false);
@@ -1451,6 +1464,8 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
           config.SiteConfig.DoubanImageProxyType || 'direct',
         DoubanImageProxy: config.SiteConfig.DoubanImageProxy || '',
         DisableYellowFilter: config.SiteConfig.DisableYellowFilter || false,
+        TVBoxEnabled: config.SiteConfig.TVBoxEnabled || false,
+        TVBoxPassword: config.SiteConfig.TVBoxPassword || '',
       });
     }
   }, [config]);
@@ -1912,6 +1927,147 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
         </p>
       </div>
 
+      {/* TVBox 配置 */}
+      <div className='space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700'>
+        <h3 className='text-base font-semibold text-gray-900 dark:text-gray-100'>
+          TVBox 接口配置
+        </h3>
+        
+        {/* TVBox 开关 */}
+        <div>
+          <div className='flex items-center justify-between'>
+            <label
+              className={`block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ${isLocalStorage ? 'opacity-50' : ''}`}
+            >
+              启用 TVBox 接口
+              {isLocalStorage && (
+                <span className='ml-2 text-xs text-gray-500 dark:text-gray-400'>
+                  (本地模式由环境变量 TVBOX_ENABLED 控制)
+                </span>
+              )}
+            </label>
+            <button
+              type='button'
+              onClick={() =>
+                !isLocalStorage &&
+                setSiteSettings((prev) => ({
+                  ...prev,
+                  TVBoxEnabled: !prev.TVBoxEnabled,
+                }))
+              }
+              disabled={isLocalStorage}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                isLocalStorage ? 'opacity-50 cursor-not-allowed' : ''
+              } ${
+                siteSettings.TVBoxEnabled
+                  ? 'bg-green-600'
+                  : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  siteSettings.TVBoxEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+            开启后可在 TVBox 中使用本站数据，访问需携带密码。
+          </p>
+        </div>
+
+        {/* TVBox 接口地址和密码 */}
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+          {/* 接口地址 */}
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              接口地址
+            </label>
+            <div className='flex gap-2'>
+              <input
+                type='text'
+                value={
+                  typeof window !== 'undefined'
+                    ? `${window.location.origin}/api/tvbox/config?pwd=${encodeURIComponent(siteSettings.TVBoxPassword || '')}`
+                    : ''
+                }
+                readOnly
+                className='flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm'
+              />
+              <button
+                type='button'
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    navigator.clipboard.writeText(
+                      `${window.location.origin}/api/tvbox/config?pwd=${encodeURIComponent(siteSettings.TVBoxPassword || '')}`
+                    );
+                  }
+                }}
+                className='px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm'
+              >
+                复制
+              </button>
+            </div>
+            <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+              将该地址填入 TVBox 的订阅/配置接口
+            </p>
+          </div>
+
+          {/* 访问密码 */}
+          <div>
+            <label
+              className={`block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ${
+                isLocalStorage ? 'opacity-50' : ''
+              }`}
+            >
+              访问密码
+              {isLocalStorage && (
+                <span className='ml-2 text-xs text-gray-500 dark:text-gray-400'>
+                  (本地模式口令为环境变量 PASSWORD)
+                </span>
+              )}
+            </label>
+            <div className='flex gap-2'>
+              <input
+                type='text'
+                placeholder='设置访问密码'
+                value={siteSettings.TVBoxPassword}
+                onChange={(e) =>
+                  !isLocalStorage &&
+                  setSiteSettings((prev) => ({
+                    ...prev,
+                    TVBoxPassword: e.target.value,
+                  }))
+                }
+                disabled={isLocalStorage}
+                className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                  isLocalStorage ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              />
+              <button
+                type='button'
+                onClick={() =>
+                  !isLocalStorage &&
+                  setSiteSettings((prev) => ({
+                    ...prev,
+                    TVBoxPassword: generateRandomPassword(),
+                  }))
+                }
+                disabled={isLocalStorage}
+                className={`px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${
+                  isLocalStorage ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                随机生成
+              </button>
+            </div>
+            <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+              建议使用随机生成的密码
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 操作按钮 */}
       <div className='flex justify-end'>
         <button
@@ -2043,6 +2199,22 @@ function AdminPageClient() {
             <h1 className='text-2xl font-bold text-gray-900 dark:text-gray-100'>
               管理员设置
             </h1>
+            {/* 缓存提示按钮 */}
+            <button
+              onClick={() => {
+                Swal.fire({
+                  title: '提示',
+                  text: '视频源配置和分类配置中的修改需要清理浏览缓存才会彻底生效，否者需等待站点配置中的接口缓存时间后才生效',
+                  icon: 'info',
+                  confirmButtonText: '我知道了',
+                  confirmButtonColor: '#3b82f6',
+                });
+              }}
+              className="w-8 h-8 p-1.5 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors"
+              aria-label="缓存提示"
+            >
+              <Bell className="w-full h-full" />
+            </button>
             {config && role === 'owner' && (
               <button
                 onClick={handleResetConfig}
